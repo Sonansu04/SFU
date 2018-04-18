@@ -1,0 +1,56 @@
+set_host_options -max_cores 8
+
+define_design_lib LAB -path ./LAB
+analyze -library LAB -format sverilog SFU_top.sv
+elaborate SFU_top -architecture verilog -library LAB
+current_design SFU_top
+
+
+set_operating_conditions -min_library sc9_cln40g_base_rvt_ff_typical_min_0p99v_m40c -min ff_typical_min_0p99v_m40c  -max_library sc9_cln40g_base_rvt_ss_typical_max_0p81v_125c -max ss_typical_max_0p81v_125c
+set_wire_load_model -name Small -library sc9_cln40g_base_rvt_ss_typical_max_0p81v_125c
+link
+uniquify
+
+
+
+set_max_delay 2.5 -from [all_inputs] -to [all_outputs]
+set_min_delay 0.1 -from [all_inputs] -to [all_outputs]
+
+
+set_fix_multiple_port_nets -feedthroughs
+set_fix_multiple_port_nets -all -buffer_constants
+check_design
+#compile -map_effort medium -boundary_optimization
+compile
+
+
+#remove_unconnected_ports -blast_buses [get_cells -hierarchical *]
+change_names -hierarchy -rule verilog
+define_name_rules name_rule -allowed "a-z A-Z 0-9 _" -max_length 255 -type cell
+define_name_rules name_rule -allowed "a-z A-Z 0-9 _[]" -max_length 255 -type net
+define_name_rules name_rule -map {{"\\*cell\\*" "cell"}}
+define_name_rules name_rule -case_insensitive
+change_names -hierarchy -rules name_rule
+
+
+
+#       Output Files            #
+
+write -hierarchy -format ddc -output SFU_v1_syn40.ddc
+write -format verilog -hierarchy -output SFU_v1_syn40.v
+write_sdf -version 2.0 -context verilog SFU_v1_syn40.sdf 
+write_sdc SFU_v1_syn40.sdc
+
+
+write -hierarchy -format ddc -output SFU_test_syn40.ddc
+write -format verilog -hierarchy -output SFU_test_syn40.v
+write_sdf -version 2.0 -context verilog SFU_test_syn40.sdf 
+write_sdc SFU_test_syn40.sdc
+
+
+
+
+
+
+uplevel #0 { report_area }
+uplevel #0 { report_timing -path full -delay max -nworst 1 -max_paths 1 -significant_digits 5 -sort_by group }

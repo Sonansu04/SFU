@@ -1,0 +1,71 @@
+#################################
+#       Import Design           #
+#################################
+define_design_lib LAB -path ./LAB
+analyze -library LAB -format verilog LCBB_compression.v
+elaborate LCBB_compression -architecture verilog -library LAB
+
+#################################
+#  Setting Design Environment   #
+#################################
+current_design LCBB_compression
+set_operating_conditions -min_library sc9_cln40g_base_rvt_ff_typical_min_0p99v_m40c -min ff_typical_min_0p99v_m40c  -max_library sc9_cln40g_base_rvt_ss_typical_max_0p81v_125c -max ss_typical_max_0p81v_125c
+set_wire_load_model -name Small -library sc9_cln40g_base_rvt_ss_typical_max_0p81v_125c
+#set_wire_load_model -name Small -library sc9_cln40g_base_rvt_ss_typical_max_0p81v_125c
+link
+uniquify
+
+#################################
+#       DC Constraints          #
+#################################
+create_clock -name "clk" -period 1.20 -waveform {0 0.60} [get_ports clk]
+#set_clock_latency 0.02 [get_clocks clk]
+#set_clock_latency -source 0.02 [get_clocks clk]
+#set_clock_uncertainty 0.01 [get_clocks clk]
+set_dont_touch_network [get_clock clk]
+set_fix_hold [get_clocks clk]
+set_ideal_network [get_ports reset] -no_propagate
+set_ideal_network [get_ports clk] -no_propagate
+
+#Setting DRC Constraint
+#set_max_area 0
+set_max_fanout 1 [get_ports reset]
+set high_fanout_net_threshold 0
+
+
+#Setting Design Environment
+#set_load [load_of "tpz973gwc/PDO12CDG/I"] [get_ports [all_outputs]]
+#set_drive [drive_of "tpz973gwc/PDIDGZ/C"] [get_ports [all_inputs]]
+set all_except_clk [remove_from_collection [all_inputs] [get_ports clk]]
+set_input_delay -max 0 -clock clk $all_except_clk
+
+#Solve Multiple Instance
+uniquify
+
+#################################
+#  Synthesis all design         #
+#################################
+#set dw_prefer_mc_inside true
+set_fix_multiple_port_nets -feedthroughs
+set_fix_multiple_port_nets -all -buffer_constants
+check_design
+compile -map_effort high -boundary_optimization
+#compile_ultra  
+#################################
+#       Change_Names            #
+#################################
+remove_unconnected_ports -blast_buses [get_cells -hierarchical *]
+change_names -hierarchy -rule verilog
+define_name_rules name_rule -allowed "a-z A-Z 0-9 _" -max_length 255 -type cell
+define_name_rules name_rule -allowed "a-z A-Z 0-9 _[]" -max_length 255 -type net
+define_name_rules name_rule -map {{"\\*cell\\*" "cell"}}
+define_name_rules name_rule -case_insensitive
+change_names -hierarchy -rules name_rule
+
+#################################
+#       Output Files            #
+#################################
+write -hierarchy -format ddc -output LCBB_compression.ddc
+write -format verilog -hierarchy -output LCBB_compression_syn.v
+write_sdf -version 2.1 -context verilog LCBB_compression_syn.sdf
+write_sdc LCBB_compression_40_syn.sdc
